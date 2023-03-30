@@ -1,15 +1,17 @@
 <template>
-  <div class="sf-sidebar" :class="[staticClass, className]">
+  <div
+    class="sf-sidebar"
+    :class="{ 'sf-sidebar--right': position === 'right' }"
+  >
     <SfOverlay :visible="visibleOverlay" />
-    <transition :name="transitionName">
+    <transition :name="transitionName" appear>
       <aside
-        v-if="visible"
+        v-if="visible && isOpen"
         ref="asideContent"
         v-focus-trap
         v-click-outside="checkPersistence"
         class="sf-sidebar__aside"
       >
-        <!--@slot Use this slot to place content inside the modal bar.-->
         <slot name="bar">
           <SfBar
             :title="title"
@@ -18,37 +20,39 @@
             @click:back="close"
           />
         </slot>
-        <!--@slot Use this slot to replace close icon.-->
         <slot name="circle-icon" v-bind="{ close, button }">
           <SfCircleIcon
-            v-if="button"
+            :class="{ 'display-none': !button }"
             icon-size="12px"
-            aria-label="Close sidebar"
+            :aria-label="'Close sidebar'"
             icon="cross"
             class="sf-sidebar__circle-icon desktop-only"
             @click="close"
           />
         </slot>
-        <div v-if="title || hasTop" class="sf-sidebar__top">
-          <!--@slot Use this slot to replace SfHeading component.-->
+        <div
+          :class="{ 'display-none': !title || (!title && !hasTop) }"
+          class="sf-sidebar__top"
+        >
           <slot name="title" v-bind="{ title, subtitle, headingLevel }">
             <SfHeading
-              v-if="title"
+              :class="{ 'display-none': !title }"
               :title="title"
               :description="subtitle"
               :level="headingLevel"
-              class="sf-heading--left sf-heading--no-underline sf-sidebar__title desktop-only"
+              class="
+                sf-heading--left sf-heading--no-underline
+                sf-sidebar__title
+                desktop-only
+              "
             />
           </slot>
-          <!--@slot Use this slot to add sticky top content.-->
           <slot name="content-top" />
         </div>
         <div class="sf-sidebar__content">
-          <!--@slot Use this slot to add SfSidebar content.-->
           <slot />
         </div>
-        <!--@slot Use this slot to place content to sticky bottom.-->
-        <div v-if="hasBottom" class="sf-sidebar__bottom">
+        <div :class="{ 'display-none': !hasBottom }" class="sf-sidebar__bottom">
           <slot name="content-bottom" />
         </div>
       </aside>
@@ -74,61 +78,44 @@ export default {
     SfHeading,
   },
   props: {
-    /**
-     * The sidebar's title
-     */
     title: {
       type: String,
       default: "",
     },
-    /**
-     * The sidebar's subtitle
-     */
     subtitle: {
       type: String,
       default: "",
     },
-    /**
-     * The heading's level
-     */
     headingLevel: {
       type: Number,
       default: 3,
     },
-    /**
-     * The close button
-     */
     button: {
       type: Boolean,
       default: true,
     },
-    /**
-     * The sidebar's visibility
-     */
     visible: {
       type: Boolean,
       default: false,
     },
-    /**
-     * The overlay's visibility
-     */
     overlay: {
       type: Boolean,
       default: true,
     },
-    /**
-     * If true clicking outside will not dismiss the sidebar
-     */
     persistent: {
       type: Boolean,
       default: false,
     },
+    position: {
+      type: String,
+      default: "left",
+      validator: (value) => ["left", "right"].includes(value),
+    },
   },
   data() {
     return {
-      position: "left",
-      staticClass: null,
-      className: null,
+      transition: this.position,
+      isOpen: this.visible,
     };
   },
   computed: {
@@ -136,7 +123,7 @@ export default {
       return this.visible && this.overlay;
     },
     transitionName() {
-      return "sf-slide-" + this.position;
+      return "sf-slide-" + this.transition;
     },
     hasTop() {
       return this.$slots.hasOwnProperty("content-top");
@@ -150,26 +137,39 @@ export default {
       handler(value) {
         if (!isClient) return;
         if (value) {
+          this.isOpen = true;
+          this.transition = this.position;
           this.$nextTick(() => {
-            disableBodyScroll(this.$refs.asideContent);
+            const sidebarContent = document.getElementsByClassName(
+              "sf-sidebar__content"
+            )[0];
+            disableBodyScroll(sidebarContent);
           });
           document.addEventListener("keydown", this.keydownHandler);
         } else {
           clearAllBodyScrollLocks();
           document.removeEventListener("keydown", this.keydownHandler);
+          this.isOpen = false;
         }
       },
       immediate: true,
     },
+    isOpen: {
+      // handle out animation for async load component
+      handler(value) {
+        if (!isClient) return;
+        if (!value) {
+          this.transition = this.position === "right" ? "left" : "right";
+        }
+      },
+    },
   },
-  mounted() {
-    this.classHandler();
-  },
-  updated() {
-    this.classHandler();
+  beforeDestroy() {
+    clearAllBodyScrollLocks();
   },
   methods: {
     close() {
+      this.isOpen = false;
       this.$emit("close");
     },
     checkPersistence() {
@@ -178,23 +178,6 @@ export default {
     keydownHandler(e) {
       if (e.key === "Escape" || e.key === "Esc" || e.keyCode === 27) {
         this.close();
-      }
-    },
-    classHandler() {
-      let update = false;
-      if (this.staticClass !== this.$vnode.data.staticClass) {
-        this.staticClass = this.$vnode.data.staticClass;
-        update = true;
-      }
-      if (this.className !== this.$vnode.data.class) {
-        this.className = this.$vnode.data.class;
-        update = true;
-      }
-      if (update) {
-        this.position =
-          [this.staticClass, this.className].toString().search("--right") > -1
-            ? "right"
-            : "left";
       }
     },
   },

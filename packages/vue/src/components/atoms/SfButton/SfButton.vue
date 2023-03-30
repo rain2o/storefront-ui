@@ -1,18 +1,26 @@
-<template>
+<template functional>
   <component
-    :is="tag"
-    v-focus
-    class="sf-button"
-    :class="{
-      'is-disabled--button': buttonActive,
-      'is-disabled--link': linkActive,
-    }"
-    v-bind="$attrs"
-    :disabled="disabled"
-    :link="link"
-    v-on="$listeners"
+    :is="props.link ? injections.components.SfLink : 'button'"
+    :class="[
+      data.class,
+      data.staticClass,
+      'sf-button',
+      {
+        'is-disabled--button': $options.buttonActive(
+          props.link,
+          props.disabled
+        ),
+        'is-disabled--link': $options.linkActive(props.link, props.disabled),
+      },
+    ]"
+    :style="[data.style, data.staticStyle]"
+    :aria-disabled="props.disabled"
+    :link="props.link"
+    :type="props.type"
+    :aria-label="props.ariaLabel"
+    v-bind="data.attrs"
+    v-on="!props.disabled ? listeners : {}"
   >
-    <!--@slot Use this slot to place content inside the button.-->
     <slot />
   </component>
 </template>
@@ -21,38 +29,38 @@ import { focus } from "../../../utilities/directives";
 import SfLink from "../SfLink/SfLink.vue";
 export default {
   name: "SfButton",
-  components: {
-    SfLink,
+  inject: {
+    components: {
+      default: { SfLink },
+    },
   },
   directives: {
     focus,
   },
   props: {
-    /**
-     * Native button disabled attribute
-     */
     disabled: {
       type: Boolean,
       default: false,
     },
-    /**
-     * Link for "a" tag, when empty it is button.
-     */
+    type: {
+      type: String,
+      default: "button",
+      validator: (value) => ["button", "submit", "reset"].includes(value),
+    },
     link: {
       type: [String, Object],
-      default: "",
+      default: null,
+    },
+    ariaLabel: {
+      type: String,
+      default: "button",
     },
   },
-  computed: {
-    tag() {
-      return this.link ? "SfLink" : "button";
-    },
-    linkActive() {
-      return this.link && this.disabled;
-    },
-    buttonActive() {
-      return !this.link && this.disabled;
-    },
+  linkActive(link, disabled) {
+    return link && disabled;
+  },
+  buttonActive(link, disabled) {
+    return !link && disabled;
   },
 };
 </script>
